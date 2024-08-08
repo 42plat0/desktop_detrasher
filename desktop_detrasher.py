@@ -10,13 +10,8 @@ from datetime import date
 
 DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
-file_count = [0, ]
-file_list = []
 
 class FileSystem():
-    global file_list, file_count
-
-
     recent_files = "Recent Files/"
         
     
@@ -26,17 +21,6 @@ class FileSystem():
     starting_count = len(files)
 
     recent_files = QDir(f"{DESKTOP_PATH}/Recent Files/")
-
-    # if len(file_list) < 2:
-    #     file_list = files
-
-    # if file_count[-1] != len(files):
-    #     file_count.append(len(files))
-
-    #     # get different file
-    #     for file in files:
-    #         if file not in file_list:
-    #             new_file = file
 
     @staticmethod
     def manageFiles():
@@ -62,13 +46,14 @@ class FileSystem():
             for file in files:
                 if file not in FileSystem.files:
                     FileSystem.move_file(file)
+                    print(f"File {file.completeBaseName()} has been moved")
 
             FileSystem.files = files
         # File was deleted
         elif FileSystem.starting_count > updating_count:
-            pass
+            FileSystem.files = files
 
-        return len(files)
+        return filesystem
 
     @staticmethod
     def move_file(new_file):
@@ -87,12 +72,15 @@ class FileSystem():
             dir.mkdir(today)
         
         today_dir = f"{dir.absolutePath()}/{today}/"
-        shutil.move(file_path, today_dir)
 
-
+        # What if file already exists with the same name?
+        try:
+            shutil.move(file_path, today_dir)
+        except Exception:
+            print("File with the same name exists")
 
 class WorkerThread(QThread):
-    update_signal = pyqtSignal(int)
+    update_signal = pyqtSignal(dict)
 
     def run(self):
         while True:
@@ -113,10 +101,12 @@ class Window(QMainWindow):
             self.thread.start()
 
     def update_file_count(self, dir_filesystem):
-        pass
-        # print(dir_filesystem)
-        # print(f"Failu skaicius: {dir_filesystem['files']}")
-        # print(f"Direktoriju skaicius: {dir_filesystem['dirs']}")
+
+        file_count = len(dir_filesystem['files'])
+        dir_count = len(dir_filesystem['dirs'])
+
+        print(f"Failu skaicius: {file_count}")
+        print(f"Direktoriju skaicius: {dir_count}")
 
 
 def main():
