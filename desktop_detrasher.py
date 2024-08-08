@@ -12,15 +12,16 @@ DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
 
 class FileSystem():
-    recent_files = "Recent Files/"
-        
-    
+    name = "Recent Files"
+
     directory = QDir(DESKTOP_PATH)
     files = directory.entryInfoList()
 
     starting_count = len(files)
 
-    recent_files = QDir(f"{DESKTOP_PATH}/Recent Files/")
+    recent_files = QDir(f"{DESKTOP_PATH}/{name}/")
+
+    directory.mkdir(name)
 
     @staticmethod
     def manageFiles():
@@ -30,7 +31,7 @@ class FileSystem():
         files = directory.entryInfoList()
         updating_count = len(files)
 
-        filesystem = {"files": [], "dirs": [], "changed": None}
+        filesystem = {"files": [], "dirs": [], "new_file": None}
 
         for entity in files:
             if entity.isFile():
@@ -39,29 +40,28 @@ class FileSystem():
                 filesystem["dirs"].append(entity)
             else:
                 raise ValueError("Neither a file nor a directory")
-        
+
         filesystem["new_file"] = FileSystem.new_file_move(files)
-        
+
         return filesystem
 
     @staticmethod
     def new_file_move(files):
         updating_count = len(files)
 
-        # Find updates to directory 
-        if FileSystem.starting_count < updating_count:            
+        # Find updates to directory
+        if FileSystem.starting_count < updating_count:
             for file in files:
                 if file not in FileSystem.files:
                     FileSystem.move_file(file)
                     new_file = file.completeBaseName()
-            
+
             FileSystem.files = files
 
             return new_file
         # File was deleted
         elif FileSystem.starting_count > updating_count:
             FileSystem.files = files
-
 
     @staticmethod
     def move_file(new_file):
@@ -78,7 +78,7 @@ class FileSystem():
 
         if not dir.exists(today):
             dir.mkdir(today)
-        
+
         today_dir = f"{dir.absolutePath()}/{today}/"
 
         # What if file already exists with the same name?
@@ -86,6 +86,7 @@ class FileSystem():
             shutil.move(file_path, today_dir)
         except Exception:
             print("File with the same name exists")
+
 
 class WorkerThread(QThread):
     update_signal = pyqtSignal(dict)
@@ -107,14 +108,13 @@ class Window(QMainWindow):
 
         if not self.thread.isRunning():
             self.thread.start()
-    
+
     def initUi(self):
         self.setWindowTitle("Desktop Detrasher")
 
         self.window = QWidget()
         self.setCentralWidget(self.window)
         self.resize(200, 100)
-
 
         file_count = str(len(FileSystem.manageFiles()['files']))
         dir_count = str(len(FileSystem.manageFiles()['dirs']))
@@ -133,7 +133,7 @@ class Window(QMainWindow):
         self.vbox.addWidget(self.dir_label)
 
     def update_file_count(self, dir_filesystem):
-        
+
         file_count = str(len(dir_filesystem['files']))
         dir_count = str(len(dir_filesystem['dirs']))
 
@@ -141,7 +141,8 @@ class Window(QMainWindow):
         self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
         if dir_filesystem["new_file"] is not None:
-            self.mbox.setText(f"File {dir_filesystem['new_file']} has been moved")
+            self.mbox.setText(
+                f"File {dir_filesystem['new_file']} has been moved")
             self.mbox.exec_()
 
 
