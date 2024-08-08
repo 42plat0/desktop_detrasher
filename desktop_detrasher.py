@@ -106,7 +106,7 @@ class Window(QMainWindow):
         self.initUi()
 
         self.thread = WorkerThread()
-        self.thread.update_signal.connect(self.update_file_count)
+        self.thread.update_signal.connect(self.update_dir_info)
 
         if not self.thread.isRunning():
             self.thread.start()
@@ -128,6 +128,8 @@ class Window(QMainWindow):
         self.dir_label = QLabel(self.window)
         self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
+        self.curr_dir_label = QLabel(self.window)
+
         self.mbox = QMessageBox()
 
         self.model = QFileSystemModel(self.window)
@@ -136,20 +138,26 @@ class Window(QMainWindow):
         self.tree = QTreeView(self.window)
         self.tree.setModel(self.model)
 
+        for i in range (1, 4):
+            self.tree.setColumnHidden(i, True)
+
         self.vbox = QVBoxLayout(self.window)
 
         self.vbox.addWidget(self.tree)
+        self.vbox.addWidget(self.curr_dir_label)
         self.vbox.addWidget(self.file_label)
         self.vbox.addWidget(self.dir_label)
 
-    def update_file_count(self, dir_filesystem):
+    def update_dir_info(self, dir_filesystem):
 
-        for i in self.tree.selectedIndexes():
-            print(i.data())
+        current_file = self.tree.currentIndex()
+        current_file_path = self.model.filePath(current_file)
+        current_file_name = current_file_path.split('/')[-1]
 
         file_count = str(len(dir_filesystem['files']))
         dir_count = str(len(dir_filesystem['dirs']))
 
+        self.curr_dir_label.setText(f"Pasirinkta: {current_file_name}")
         self.file_label.setText(f"Failu skaicius: {file_count}")
         self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
