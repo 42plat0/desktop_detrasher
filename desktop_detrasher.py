@@ -3,7 +3,7 @@ import os
 import time
 import shutil
 
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton, QMessageBox
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
 
 from datetime import date
@@ -30,7 +30,7 @@ class FileSystem():
         files = directory.entryInfoList()
         updating_count = len(files)
 
-        filesystem = {"files": [], "dirs": []}
+        filesystem = {"files": [], "dirs": [], "changed": None}
 
         for entity in files:
             if entity.isFile():
@@ -39,21 +39,29 @@ class FileSystem():
                 filesystem["dirs"].append(entity)
             else:
                 raise ValueError("Neither a file nor a directory")
-            
         
+        filesystem["new_file"] = FileSystem.new_file_move(files)
+        
+        return filesystem
+
+    @staticmethod
+    def new_file_move(files):
+        updating_count = len(files)
+
         # Find updates to directory 
         if FileSystem.starting_count < updating_count:            
             for file in files:
                 if file not in FileSystem.files:
                     FileSystem.move_file(file)
-                    print(f"File {file.completeBaseName()} has been moved")
-
+                    new_file = file.completeBaseName()
+            
             FileSystem.files = files
+
+            return new_file
         # File was deleted
         elif FileSystem.starting_count > updating_count:
             FileSystem.files = files
 
-        return filesystem
 
     @staticmethod
     def move_file(new_file):
@@ -92,28 +100,56 @@ class Window(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.filesystem = FileSystem()
+        self.initUi()
 
         self.thread = WorkerThread()
         self.thread.update_signal.connect(self.update_file_count)
 
         if not self.thread.isRunning():
             self.thread.start()
+    
+    def initUi(self):
+        self.setWindowTitle("Desktop Detrasher")
+
+        self.window = QWidget()
+        self.setCentralWidget(self.window)
+        self.resize(200, 100)
+
+
+        file_count = str(len(FileSystem.manageFiles()['files']))
+        dir_count = str(len(FileSystem.manageFiles()['dirs']))
+
+        self.file_label = QLabel(self.window)
+        self.file_label.setText(f"Failu skaicius: {file_count}")
+
+        self.dir_label = QLabel(self.window)
+        self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
+
+        self.mbox = QMessageBox()
+
+        self.vbox = QVBoxLayout(self.window)
+
+        self.vbox.addWidget(self.file_label)
+        self.vbox.addWidget(self.dir_label)
 
     def update_file_count(self, dir_filesystem):
+        
+        file_count = str(len(dir_filesystem['files']))
+        dir_count = str(len(dir_filesystem['dirs']))
 
-        file_count = len(dir_filesystem['files'])
-        dir_count = len(dir_filesystem['dirs'])
+        self.file_label.setText(f"Failu skaicius: {file_count}")
+        self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
-        print(f"Failu skaicius: {file_count}")
-        print(f"Direktoriju skaicius: {dir_count}")
+        if dir_filesystem["new_file"] is not None:
+            self.mbox.setText(f"File {dir_filesystem['new_file']} has been moved")
+            self.mbox.exec_()
 
 
 def main():
     app = QApplication([])
 
     window = Window()
-
+    window.show()
     sys.exit(app.exec_())
 
 
