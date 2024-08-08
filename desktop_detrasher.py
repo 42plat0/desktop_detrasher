@@ -24,14 +24,18 @@ class FileSystem():
     parent_dir = QDir(PARENT_DIR_PATH)
 
     @staticmethod
-    def manageFiles():
+    def manageFiles(path=None):
 
         # updating file info
-        target_dir = QDir(DESKTOP_PATH)
+        if path is not None:
+            target_dir = QDir(path)
+        else:
+            target_dir = QDir(DESKTOP_PATH)
         files = target_dir.entryInfoList()
 
         # Track file groups
         filesystem = {"files": [], "dirs": [], "new_file": None}
+
 
         for entity in files:
             if entity.fileName() not in [".", ".."]:
@@ -91,12 +95,12 @@ class FileSystem():
 
 
 class WorkerThread(QThread):
-    update_signal = pyqtSignal(dict)
+    update_signal = pyqtSignal()
 
     def run(self):
         while True:
             time.sleep(1)
-            self.update_signal.emit(FileSystem.manageFiles())
+            self.update_signal.emit()
 
 
 class Window(QMainWindow):
@@ -148,24 +152,31 @@ class Window(QMainWindow):
         self.vbox.addWidget(self.file_label)
         self.vbox.addWidget(self.dir_label)
 
-    def update_dir_info(self, dir_filesystem):
-
+    def update_dir_info(self):
+        
         current_file = self.tree.currentIndex()
         current_file_path = self.model.filePath(current_file)
         current_file_name = current_file_path.split('/')[-1]
 
-        file_count = str(len(dir_filesystem['files']))
-        dir_count = str(len(dir_filesystem['dirs']))
+        current = QDir(current_file_path)
+        # print(current.entryInfoList())
+
+        for entity, files in FileSystem.manageFiles(path=current_file_path).items():
+            if entity == "files":
+                file_count = len(files)
+            elif entity == "dirs":
+                dir_count = len(files)
+
 
         self.curr_dir_label.setText(f"Pasirinkta: {current_file_name}")
-        self.file_label.setText(f"Failu skaicius: {file_count}")
-        self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
+        self.file_label.setText(f"Failu skaicius: {str(file_count)}")
+        self.dir_label.setText(f"Direktoriju skaicius: {str(dir_count)}")
 
-        # New file was created
-        if dir_filesystem["new_file"] is not None:
-            self.mbox.setText(
-                f"File {dir_filesystem['new_file']} has been moved")
-            self.mbox.exec_()
+        # # New file was created
+        # if dir_filesystem["new_file"] is not None:
+        #     self.mbox.setText(
+        #         f"File {dir_filesystem['new_file']} has been moved")
+        #     self.mbox.exec_()
 
 
 def main():
