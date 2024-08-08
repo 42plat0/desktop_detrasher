@@ -10,27 +10,27 @@ from datetime import date
 
 DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
+PARENT_DIR_NAME = "Recent Files"
+PARENT_DIR_PATH = f"{DESKTOP_PATH}/{PARENT_DIR_NAME}/"
 
 class FileSystem():
-    name = "Recent Files"
 
-    directory = QDir(DESKTOP_PATH)
-    files = directory.entryInfoList()
+    target_dir = QDir(DESKTOP_PATH)
+    target_dir.mkdir(PARENT_DIR_NAME)
 
-    starting_count = len(files)
+    files_on_init = target_dir.entryInfoList()
+    file_count_on_init = len(files_on_init)
 
-    recent_files = QDir(f"{DESKTOP_PATH}/{name}/")
-
-    directory.mkdir(name)
+    parent_dir = QDir(PARENT_DIR_PATH)
 
     @staticmethod
     def manageFiles():
-        directory = QDir(DESKTOP_PATH)
 
         # updating file info
-        files = directory.entryInfoList()
-        updating_count = len(files)
+        target_dir = QDir(DESKTOP_PATH)
+        files = target_dir.entryInfoList()
 
+        # Track file groups
         filesystem = {"files": [], "dirs": [], "new_file": None}
 
         for entity in files:
@@ -41,30 +41,37 @@ class FileSystem():
             else:
                 raise ValueError("Neither a file nor a directory")
 
-        filesystem["new_file"] = FileSystem.new_file_move(files)
+        new_file = FileSystem.get_new_file(files)
+
+        if new_file is not None:
+            # Used to display message to user
+            filesystem["new_file"] = new_file.completeBaseName()
+            
+            FileSystem.move_file(new_file)
 
         return filesystem
 
     @staticmethod
-    def new_file_move(files):
+    def get_new_file(files):
         updating_count = len(files)
 
-        # Find updates to directory
-        if FileSystem.starting_count < updating_count:
+        # File was created
+        if FileSystem.file_count_on_init < updating_count:
             for file in files:
-                if file not in FileSystem.files:
-                    FileSystem.move_file(file)
-                    new_file = file.completeBaseName()
-
-            FileSystem.files = files
-
-            return new_file
+                if file not in FileSystem.files_on_init:
+                    return file
         # File was deleted
-        elif FileSystem.starting_count > updating_count:
-            FileSystem.files = files
+        elif FileSystem.file_count_on_init > updating_count:
+            FileSystem.files_on_init = files
 
     @staticmethod
     def move_file(new_file):
+        dir = FileSystem.parent_dir
+        
+        today = date.today().strftime("%Y-%m-%d")
+        today_dir = f"{dir.absolutePath()}/{today}/"
+
+        # Suffix needed to move file
         if new_file.isFile():
             file_name = f"{new_file.completeBaseName()}.{new_file.suffix()}"
         elif new_file.isDir():
@@ -72,14 +79,8 @@ class FileSystem():
 
         file_path = f"{new_file.absolutePath()}/{file_name}"
 
-        today = date.today().strftime("%Y-%m-%d")
-
-        dir = FileSystem.recent_files
-
         if not dir.exists(today):
             dir.mkdir(today)
-
-        today_dir = f"{dir.absolutePath()}/{today}/"
 
         # What if file already exists with the same name?
         try:
@@ -115,7 +116,8 @@ class Window(QMainWindow):
         self.window = QWidget()
         self.setCentralWidget(self.window)
         self.resize(200, 100)
-
+        
+        # Conversion to str for label display
         file_count = str(len(FileSystem.manageFiles()['files']))
         dir_count = str(len(FileSystem.manageFiles()['dirs']))
 
@@ -127,10 +129,10 @@ class Window(QMainWindow):
 
         self.mbox = QMessageBox()
 
-        self.vbox = QVBoxLayout(self.window)
+        vbox = QVBoxLayout(self.window)
 
-        self.vbox.addWidget(self.file_label)
-        self.vbox.addWidget(self.dir_label)
+        vbox.addWidget(self.file_label)
+        vbox.addWidget(self.dir_label)
 
     def update_file_count(self, dir_filesystem):
 
@@ -140,6 +142,7 @@ class Window(QMainWindow):
         self.file_label.setText(f"Failu skaicius: {file_count}")
         self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
+        # New file was created
         if dir_filesystem["new_file"] is not None:
             self.mbox.setText(
                 f"File {dir_filesystem['new_file']} has been moved")
@@ -150,7 +153,9 @@ def main():
     app = QApplication([])
 
     window = Window()
+    
     window.show()
+
     sys.exit(app.exec_())
 
 
