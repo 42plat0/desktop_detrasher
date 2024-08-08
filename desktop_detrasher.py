@@ -1,47 +1,39 @@
 import sys
 import os
 import time
+import shutil
 
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton, QMessageBox
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
 
 from datetime import date
 
 DESKTOP_PATH = os.path.join(os.path.expanduser("~"), "Desktop")
 
-file_count = [0, ]
-file_list = []
 
 class FileSystem():
-    def __init__(self):
-        global file_list, file_count
+    name = "Recent Files"
 
-        self.directory = QDir(DESKTOP_PATH)
+    directory = QDir(DESKTOP_PATH)
+    files = directory.entryInfoList()
 
-        self.recent_files = "Recent Files/"
+    starting_count = len(files)
 
-        self.date = date.today().strftime("%Y-%m-%d")
+    recent_files = QDir(f"{DESKTOP_PATH}/{name}/")
 
-        self.files = self.directory.entryInfoList()
+    directory.mkdir(name)
 
-        if len(file_list) < 2:
-            file_list = self.files
+    @staticmethod
+    def manageFiles():
+        directory = QDir(DESKTOP_PATH)
 
-        if file_count[-1] != len(self.files):
-            file_count.append(len(self.files))
+        # updating file info
+        files = directory.entryInfoList()
+        updating_count = len(files)
 
-            # get different file
-            for file in self.files:
-                if file not in file_list:
-                    self.new_file = file
+        filesystem = {"files": [], "dirs": [], "new_file": None}
 
-
-    def get_dir_file_groups(self):
-        is_state_diff = self.is_state_changed()
-
-        filesystem = {"files": [], "dirs": []}
-
-        for entity in self.files:
+        for entity in files:
             if entity.isFile():
                 filesystem["files"].append(entity)
             elif entity.isDir():
@@ -49,50 +41,51 @@ class FileSystem():
             else:
                 raise ValueError("Neither a file nor a directory")
 
-        if is_state_diff is True:
-            self.manage_new_file()
-            print(self.new_file)
+        filesystem["new_file"] = FileSystem.new_file_move(files)
 
         return filesystem
 
-    def is_state_changed(self):
-        global file_count
+    @staticmethod
+    def new_file_move(files):
+        updating_count = len(files)
 
-        if len(file_count) > 2:
-            file_count.pop(0)
-            return file_count[-1] != file_count[-2]
+        # Find updates to directory
+        if FileSystem.starting_count < updating_count:
+            for file in files:
+                if file not in FileSystem.files:
+                    FileSystem.move_file(file)
+                    new_file = file.completeBaseName()
 
-    def get_file_group_count(self):
-        groups = self.get_dir_file_groups()
+            FileSystem.files = files
 
-        file_count = len(groups["files"])
-        dir_count = len(groups["dirs"])
+            return new_file
+        # File was deleted
+        elif FileSystem.starting_count > updating_count:
+            FileSystem.files = files
 
-        return {"files": file_count, "dirs": dir_count}
+    @staticmethod
+    def move_file(new_file):
+        if new_file.isFile():
+            file_name = f"{new_file.completeBaseName()}.{new_file.suffix()}"
+        elif new_file.isDir():
+            file_name = new_file.completeBaseName()
 
-    # sukurti folderi naujiem fialam, jei data ta pati sukurimo fialo,
-        # QDir.exists()
-    # tai tada dedam i ta pacia data pagla kuria sukurtas folderis
-    # tada sukuriam nauja jei nauja data ir ner ta data folderio
+        file_path = f"{new_file.absolutePath()}/{file_name}"
 
-    def manage_new_file(self):
-        # create new parent dir
-        # doesnt recreate if exists
-        self.directory.mkdir(self.recent_files)
+        today = date.today().strftime("%Y-%m-%d")
 
-        self.recent_files_dir = QDir(f"{DESKTOP_PATH}/{self.recent_files}")
+        dir = FileSystem.recent_files
 
-        date_dir = f"{self.recent_files_dir.path()}/{self.date}/"
+        if not dir.exists(today):
+            dir.mkdir(today)
 
-        # second created file in a day
-        if self.recent_files_dir.exists(self.date):
-            print(self.new_file)
-            # os.replace(self.new_file.absoluteFilePath(), date_dir)
-        else:  # first file
-            self.recent_files_dir.mkdir(self.date)
+        today_dir = f"{dir.absolutePath()}/{today}/"
 
-#   TWO THREADS
-# Vienas threadas updatina counta, kitas threadas lygina ar pasikeite:
+        # What if file already exists with the same name?
+        try:
+            shutil.move(file_path, today_dir)
+        except Exception:
+            print("File with the same name exists")
 
 
 class WorkerThread(QThread):
@@ -101,14 +94,12 @@ class WorkerThread(QThread):
     def run(self):
         while True:
             time.sleep(1)
-            self.update_signal.emit(FileSystem().get_file_group_count())
+            self.update_signal.emit(FileSystem.manageFiles())
 
 
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-
-        self.filesystem = FileSystem()
 
         self.initUi()
 
@@ -121,39 +112,45 @@ class Window(QMainWindow):
     def initUi(self):
         self.setWindowTitle("Desktop Detrasher")
 
-        window = QWidget()
-        self.setCentralWidget(window)
+        self.window = QWidget()
+        self.setCentralWidget(self.window)
         self.resize(200, 100)
 
-        dir_filesystem = self.filesystem.get_file_group_count()
+        file_count = str(len(FileSystem.manageFiles()['files']))
+        dir_count = str(len(FileSystem.manageFiles()['dirs']))
 
-        file_count = str(dir_filesystem["files"])
-        dir_count = str(dir_filesystem["dirs"])
-
-        self.file_label = QLabel(window)
+        self.file_label = QLabel(self.window)
         self.file_label.setText(f"Failu skaicius: {file_count}")
 
-        self.dir_label = QLabel(window)
+        self.dir_label = QLabel(self.window)
         self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
 
-        vbox = QVBoxLayout(window)
+        self.mbox = QMessageBox()
 
-        # vbox.addWidget(desktop)
-        vbox.addWidget(self.file_label)
-        vbox.addWidget(self.dir_label)
+        self.vbox = QVBoxLayout(self.window)
+
+        self.vbox.addWidget(self.file_label)
+        self.vbox.addWidget(self.dir_label)
 
     def update_file_count(self, dir_filesystem):
-        self.file_label.setText(f"Failu skaicius: {dir_filesystem['files']}")
-        self.dir_label.setText(f"Direktoriju skaicius: {dir_filesystem['dirs']}")
+
+        file_count = str(len(dir_filesystem['files']))
+        dir_count = str(len(dir_filesystem['dirs']))
+
+        self.file_label.setText(f"Failu skaicius: {file_count}")
+        self.dir_label.setText(f"Direktoriju skaicius: {dir_count}")
+
+        if dir_filesystem["new_file"] is not None:
+            self.mbox.setText(
+                f"File {dir_filesystem['new_file']} has been moved")
+            self.mbox.exec_()
 
 
 def main():
     app = QApplication([])
 
     window = Window()
-
     window.show()
-
     sys.exit(app.exec_())
 
 
