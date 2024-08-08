@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import shutil
 
 from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
@@ -17,12 +18,14 @@ class FileSystem():
 
 
     recent_files = "Recent Files/"
-
-    date = date.today().strftime("%Y-%m-%d")
+        
+    
     directory = QDir(DESKTOP_PATH)
     files = directory.entryInfoList()
 
     starting_count = len(files)
+
+    recent_files = QDir(f"{DESKTOP_PATH}/Recent Files/")
 
     # if len(file_list) < 2:
     #     file_list = files
@@ -58,8 +61,9 @@ class FileSystem():
         if FileSystem.starting_count < updating_count:            
             for file in files:
                 if file not in FileSystem.files:
-                    print(file.absoluteFilePath())
-            print(True)
+                    FileSystem.move_file(file)
+
+            FileSystem.files = files
         # File was deleted
         elif FileSystem.starting_count > updating_count:
             pass
@@ -67,16 +71,24 @@ class FileSystem():
         return len(files)
 
     @staticmethod
-    def move_file(new_file_list):
-        pass
+    def move_file(new_file):
+        if new_file.isFile():
+            file_name = f"{new_file.completeBaseName()}.{new_file.suffix()}"
+        elif new_file.isDir():
+            file_name = new_file.completeBaseName()
 
-    @staticmethod
-    def get_file_group_count():
-        groups = FileSystem.manageFiles()
-        file_count = len(groups["files"])
-        dir_count = len(groups["dirs"])
+        file_path = f"{new_file.absolutePath()}/{file_name}"
 
-        return {"files": file_count, "dirs": dir_count}
+        today = date.today().strftime("%Y-%m-%d")
+
+        dir = FileSystem.recent_files
+
+        if not dir.exists(today):
+            dir.mkdir(today)
+        
+        today_dir = f"{dir.absolutePath()}/{today}/"
+        shutil.move(file_path, today_dir)
+
 
 
 class WorkerThread(QThread):
