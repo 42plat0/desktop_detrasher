@@ -3,7 +3,7 @@ import os
 import time
 import shutil
 
-from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QVBoxLayout, QApplication, QPushButton, QMessageBox, QFileSystemModel, QTreeView
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
 
 from datetime import date
@@ -116,7 +116,7 @@ class Window(QMainWindow):
 
         self.window = QWidget()
         self.setCentralWidget(self.window)
-        self.resize(200, 100)
+        self.resize(500, 400)
         
         # Conversion to str for label display
         file_count = str(len(FileSystem.manageFiles()['files']))
@@ -130,12 +130,22 @@ class Window(QMainWindow):
 
         self.mbox = QMessageBox()
 
-        vbox = QVBoxLayout(self.window)
+        self.model = QFileSystemModel(self.window)
+        self.model.setRootPath("")
 
-        vbox.addWidget(self.file_label)
-        vbox.addWidget(self.dir_label)
+        self.tree = QTreeView(self.window)
+        self.tree.setModel(self.model)
+
+        self.vbox = QVBoxLayout(self.window)
+
+        self.vbox.addWidget(self.tree)
+        self.vbox.addWidget(self.file_label)
+        self.vbox.addWidget(self.dir_label)
 
     def update_file_count(self, dir_filesystem):
+
+        for i in self.tree.selectedIndexes():
+            print(i.data())
 
         file_count = str(len(dir_filesystem['files']))
         dir_count = str(len(dir_filesystem['dirs']))
