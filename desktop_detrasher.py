@@ -34,12 +34,13 @@ class FileSystem():
         filesystem = {"files": [], "dirs": [], "new_file": None}
 
         for entity in files:
-            if entity.isFile():
-                filesystem["files"].append(entity)
-            elif entity.isDir():
-                filesystem["dirs"].append(entity)
-            else:
-                raise ValueError("Neither a file nor a directory")
+            if entity.fileName() not in [".", ".."]:
+                if entity.isFile():
+                    filesystem["files"].append(entity)
+                elif entity.isDir():
+                    filesystem["dirs"].append(entity)
+                else:
+                    raise ValueError("Neither a file nor a directory")
 
         new_file = FileSystem.get_new_file(files)
 
